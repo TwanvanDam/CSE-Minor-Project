@@ -260,5 +260,5 @@ if __name__ == '__main__':
         output_title = sys.argv[1]
         start_file = int(sys.argv[2])
         end_file = int(sys.argv[3])
-    print(f"Calculating yield point for files {start_file} - {end_file} in the data directory and saving in "+output_title)
+    print(f"Calculating yield points for files {start_file} - {end_file} in the data directory and saving in "+output_title)
     output_yield_points(output_title,start_file,end_file) 
