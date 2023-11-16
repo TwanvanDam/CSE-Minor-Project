@@ -1,4 +1,4 @@
 # Ignore CSV files in a specific directory
 data/FEMResults/*.csv
 data/FEMResults/Weird_Data/*.csv
-
+*.txt
