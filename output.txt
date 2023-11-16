@@ -1,0 +1,16 @@
+Scan032_005.csv, 43.61
+Scan031_006.csv, 20.24
+Scan031_008.csv, 18.35
+Scan031_007.csv, 19.25
+Scan031_010.csv, 25.33
+Scan031_009.csv, 29.21
+Scan032_001.csv, 25.03
+Scan032_003.csv, 23.62
+Scan032_004.csv, 20.09
+Scan001_002.csv, 40.50
+Scan001_005.csv, 4.90
+Scan001_006.csv, 40.19
+Scan001_011.csv, 35.11
+Scan001_008.csv, 22.87
+Scan001_015.csv, 31.61
+Scan001_012.csv, 42.22
