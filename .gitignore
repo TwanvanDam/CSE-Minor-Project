@@ -2,3 +2,4 @@
 data/FEMResults/*.csv
 data/FEMResults/Weird_Data/*.csv
 *.txt
+Results/Plots/*

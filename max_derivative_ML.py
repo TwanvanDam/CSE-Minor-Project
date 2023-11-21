@@ -81,7 +81,7 @@ def thieleInterpolator(x, y):
         return y[0] + (xin-x[0]) / (rho0[1]+a)
     return t
 
-def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=True,verbose=True):
+def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=True,verbose=True,save=False):
     ''' Return location (in strain) of maximum of energy derivative
         by approximating the Energy with Gaussian Process (which is now derivable)
         in order to find a precise location (on the approximation)
@@ -98,7 +98,7 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     training_iter = 200
 
     strain_array = np.array(data['time'])/max(np.array(data['time']))
-    stress_array = -np.array(data['stress_11_top'])/max(-np.array(data['stress_11_top']))
+    stress_array = -np.array(data['stress_11_top'])/max(-np.array(data['stress_11_top'])) #Normalized stress array
     energy_array = strain_array * stress_array
 
     der_energy_array = []
@@ -163,10 +163,10 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         observed_pred = likelihood(model(test_x))
 
-    if verbose:
+    if do_show or save:
         with torch.no_grad():
             # Initialize plot
-            f, ax = plt.subplots(1, 1, figsize=(4, 3))
+            f, ax = plt.subplots(1, 1, figsize=(12, 9))
     
             # Get upper and lower confidence bounds
             lower, upper = observed_pred.confidence_region()
@@ -177,9 +177,14 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
             # Shade between the lower and upper confidence bounds
             ax.fill_between(test_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5)
             # ax.set_ylim([-3, 3])
+            ax.set_xlim([min(train_x.numpy())-0.05,max(train_x.numpy())+0.05])
+            ax.set_ylim([min(train_y.numpy())-0.05,max(train_y.numpy())+0.05])
             ax.legend(['Observed Data', 'Mean', 'Confidence'])
-    
-            plt.show()
+            if save:
+                plt.savefig("Results/Plots/Confidence/Confidence"+fig_filename,dpi=300)
+            if do_show:
+                plt.show()
+            plt.close()
 
     # test_x = torch.linspace(0.02, 0.04, 1000)
     X = torch.autograd.Variable(torch.Tensor(test_x), requires_grad=True)
@@ -196,36 +201,37 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
 
     strain_array_true = strain_array * max(np.array(data['time']))/sample_height #- 0.006384
     test_x_np_true = test_x_np * max(np.array(data['time']))/sample_height #- 0.006384
-    stress_array_true = stress_array * max(-np.array(data['stress_11_top'])) * 1000 / area
+    stress_array_true = stress_array * max(-np.array(data['stress_11_top'])) * 1000 / area #TODO multiplication factor
     
-    if verbose:
+    if do_show or save:
         fig = P.figure(figsize=[6.4, 8])
         # first subplot: strain-stress
         ax = fig.add_subplot(211)
         plt.subplots_adjust(bottom=0.08, top=0.95, hspace=0.1)
-        plt.plot(strain_array_true, stress_array_true, 'k-')
+        plt.plot(strain_array_true, stress_array_true, 'k-',label="Observed Data")
         plt.axvline(x=test_x_np_true[i_max])
         # plt.xlim(0,0.040)
         # plt.ylim(0,40)
         plt.ylabel('Top stress (MPa)', fontsize=15)
-        # plt.legend()
+        plt.legend()
         # Second subplot: derivative energy (approximation)
         ax = fig.add_subplot(212)
         plt.plot(strain_array_true[:-1], der_energy_array, color=(0.5, 0.5, 0.5), linewidth=0.8, linestyle='solid', label='Raw discrete derivative')
-        plt.plot(test_x_np_true, derivative, color=(0, 0, 0), linewidth=1.2, linestyle='solid', label='GP approximation')
+        plt.plot(test_x_np_true, derivative, color=(0, 0, 0), linewidth=1.2, linestyle='solid', label='GP approximation derivative')
         plt.axvline(x=test_x_np_true[i_max])
         # plt.xlim(0,0.040)
         # plt.ylim(-20,140)
-        plt.yticks([])
+        #plt.yticks([])
         plt.xlabel('Vertical Strain', fontsize=15)
         plt.ylabel('Mechanical work derivative', fontsize=15)
         plt.legend()
     
-        if not do_show:
-            plt.savefig(fig_filename, format='eps', dpi=1000)
+        if save:
+            plt.savefig("Results/Plots/Max/"+fig_filename, dpi=300)
             print('Figure saved as {0}'.format(fig_filename))
-        else:
+        if do_show:
             plt.show()
+        plt.close()
     if i_max > stress_array_true.shape:
         return None
     else:
@@ -240,7 +246,7 @@ def output_yield_points(output_title,start,end):
                 i += 1
                 if (i > start) and (i <= end):
                     if csv_filename != "Weird_Data":
-                        yield_point = computeMaxEnergyDerivative('fig_exp_protocol.eps', csv_filename, do_show=True,verbose=verbose)
+                        yield_point = computeMaxEnergyDerivative('fig_exp_protocol.eps', csv_filename, do_show=False,verbose=False,save=False)
                         if yield_point != None: 
                             output.writelines(f"{csv_filename}, {yield_point:.2f}\n")
                         else:   #If the yield point cannot be determined move the file to a different folder.
@@ -248,17 +254,31 @@ def output_yield_points(output_title,start,end):
                             os.rename(data_dir+csv_filename,data_dir+"Weird_Data/"+csv_filename)
                     bar()
 
+
 if __name__ == '__main__':
     cwd = os.getcwd() #Get the current directory
     data_dir = cwd + "/data/FEMResults/" #Put the data in this directory
     verbose = False
     num_files = len(os.listdir(data_dir))
-    output_title = "output.txt"
+    output_title = "Results/output.txt"
     start_file = 0
-    end_file = num_files
+    end_file = 200 #num_files
     if len(sys.argv) > 1:
-        output_title = sys.argv[1]
-        start_file = int(sys.argv[2])
-        end_file = int(sys.argv[3])
-    print(f"Calculating yield points for files {start_file} - {end_file} in the data directory and saving in "+output_title)
-    output_yield_points(output_title,start_file,end_file) 
+        start_file = int(sys.argv[1])
+        end_file = int(sys.argv[2])
+        output_title = sys.argv[3]
+    #print(f"Calculating yield points for files {start_file} - {end_file} in the data directory and saving in "+output_title)
+    #output_yield_points(output_title,start_file,end_file)
+    with alive_bar(end_file) as bar:
+        for i in range(end_file):
+            computeMaxEnergyDerivative(os.listdir(data_dir)[i]
+                                       .replace(".csv",".png"),os.listdir(data_dir)[i]
+                                       ,do_show=False, verbose=False,save=True)
+            bar()
+
+
+#TODO
+#export data for machine learning. Done
+#find nice datasets 
+#compare to bad ones
+#optimize hyperparamters
