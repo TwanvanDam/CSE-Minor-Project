@@ -81,7 +81,7 @@ def thieleInterpolator(x, y):
         return y[0] + (xin-x[0]) / (rho0[1]+a)
     return t
 
-def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=True,verbose=True,save=False):
+def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=True,verbose=True,save=False,training_size=100):
     ''' Return location (in strain) of maximum of energy derivative
         by approximating the Energy with Gaussian Process (which is now derivable)
         in order to find a precise location (on the approximation)
@@ -106,8 +106,8 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     for i in range(0,len(energy_array)-1):
       der_energy_array.append((energy_array[i+1]-energy_array[i])/(strain_array[i+1]-strain_array[i]))
 
-    train_x = torch.from_numpy(strain_array[:100]).float()
-    train_y = torch.from_numpy(energy_array[:100]).float()
+    train_x = torch.from_numpy(strain_array[:training_size]).float()
+    train_y = torch.from_numpy(energy_array[:training_size]).float()
 
     # We will use the simplest form of GP model, exact inference
     class ExactGPModel(gpytorch.models.ExactGP):
@@ -163,7 +163,7 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         observed_pred = likelihood(model(test_x))
 
-    if do_show or save:
+    """if do_show or save:
         with torch.no_grad():
             # Initialize plot
             f, ax = plt.subplots(1, 1, figsize=(12, 9))
@@ -173,7 +173,8 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
             # Plot training data as black stars
             ax.plot(train_x.numpy(), train_y.numpy(), 'k*')
             # Plot predictive means as blue line
-            ax.plot(test_x.numpy(), observed_pred.mean.numpy(), 'b')
+            mean = observed_pred.mean.numpy()
+            ax.plot(test_x.numpy(), mean, 'b')
             # Shade between the lower and upper confidence bounds
             ax.fill_between(test_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5)
             # ax.set_ylim([-3, 3])
@@ -184,7 +185,8 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
                 plt.savefig("Results/Plots/Confidence/Confidence"+fig_filename,dpi=300)
             if do_show:
                 plt.show()
-            plt.close()
+            if not do_show:
+                plt.close()"""
 
     # test_x = torch.linspace(0.02, 0.04, 1000)
     X = torch.autograd.Variable(torch.Tensor(test_x), requires_grad=True)
@@ -203,15 +205,19 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     test_x_np_true = test_x_np * max(np.array(data['time']))/sample_height #- 0.006384
     stress_array_true = stress_array * max(-np.array(data['stress_11_top'])) * 1000 / area #TODO multiplication factor
     
+    gp_stress = (observed_pred.mean.detach().numpy()/ test_x) * (max(-np.array(data['stress_11_top']))) * 1000 / area
+    
     if do_show or save:
         fig = P.figure(figsize=[6.4, 8])
         # first subplot: strain-stress
         ax = fig.add_subplot(211)
         plt.subplots_adjust(bottom=0.08, top=0.95, hspace=0.1)
-        plt.plot(strain_array_true, stress_array_true, 'k-',label="Observed Data")
+        plt.plot(strain_array_true, stress_array_true, '.',label="Observed Data",color=(0.5, 0.5, 0.5))
+        plt.plot(test_x_np_true,gp_stress,'-',label="GP approximation",color=(0, 0, 0))
         plt.axvline(x=test_x_np_true[i_max])
+        plt.axvline(x=0.001*training_size,color='red',label='training window')
         # plt.xlim(0,0.040)
-        # plt.ylim(0,40)
+        plt.ylim(0,max(stress_array_true))
         plt.ylabel('Top stress (MPa)', fontsize=15)
         plt.legend()
         # Second subplot: derivative energy (approximation)
@@ -231,7 +237,8 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
             print('Figure saved as {0}'.format(fig_filename))
         if do_show:
             plt.show()
-        plt.close()
+        if not do_show:
+            plt.close()
     if i_max > stress_array_true.shape:
         return None
     else:
@@ -253,6 +260,11 @@ def output_yield_points(output_title,start,end):
                             output.writelines(f"{csv_filename}, yield = None, {time.time()-start:.1f}\n") 
                             os.rename(data_dir+csv_filename,data_dir+"Weird_Data/"+csv_filename)
                     bar()
+def make_plots(filename,show=True,training_size=100):
+    computeMaxEnergyDerivative(filename
+                               .replace(".csv",".png"),filename
+                               ,do_show=show, verbose=False,save=True,training_size=training_size)
+    return
 
 
 if __name__ == '__main__':
@@ -262,23 +274,23 @@ if __name__ == '__main__':
     num_files = len(os.listdir(data_dir))
     output_title = "Results/output.txt"
     start_file = 0
-    end_file = 200 #num_files
+    end_file = num_files
     if len(sys.argv) > 1:
         start_file = int(sys.argv[1])
         end_file = int(sys.argv[2])
         output_title = sys.argv[3]
     #print(f"Calculating yield points for files {start_file} - {end_file} in the data directory and saving in "+output_title)
     #output_yield_points(output_title,start_file,end_file)
-    with alive_bar(end_file) as bar:
+    """with alive_bar(end_file) as bar:
         for i in range(end_file):
-            computeMaxEnergyDerivative(os.listdir(data_dir)[i]
-                                       .replace(".csv",".png"),os.listdir(data_dir)[i]
-                                       ,do_show=False, verbose=False,save=True)
-            bar()
+            if data_dir[i] != "Weird_Data":
+                make_plots(os.listdir(data_dir)[i],show=False,training_size=150)
+            bar()"""
+    make_plots("Scan001_005.csv",training_size=100)
 
 
 #TODO
 #export data for machine learning. Done
-#find nice datasets 
-#compare to bad ones
+#find nice datasets Done
+#compare to bad ones Done
 #optimize hyperparamters
