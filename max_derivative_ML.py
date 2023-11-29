@@ -95,7 +95,7 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     area = math.pi*pow(sample_diameter/2,2)
 
     #Iterations of bayesian regression (loss should be minimal)
-    training_iter = 200
+    training_iter = 500
 
     strain_array = np.array(data['time'])/max(np.array(data['time']))
     stress_array = -np.array(data['stress_11_top'])/max(-np.array(data['stress_11_top'])) #Normalized stress array
@@ -106,8 +106,8 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     for i in range(0,len(energy_array)-1):
       der_energy_array.append((energy_array[i+1]-energy_array[i])/(strain_array[i+1]-strain_array[i]))
 
-    train_x = torch.from_numpy(strain_array[:training_size]).float()
-    train_y = torch.from_numpy(energy_array[:training_size]).float()
+    train_x = torch.from_numpy(strain_array).float()
+    train_y = torch.from_numpy(energy_array).float()
 
     # We will use the simplest form of GP model, exact inference
     class ExactGPModel(gpytorch.models.ExactGP):
@@ -263,7 +263,7 @@ def output_yield_points(output_title,start,end):
 def make_plots(filename,show=True,training_size=100):
     computeMaxEnergyDerivative(filename
                                .replace(".csv",".png"),filename
-                               ,do_show=show, verbose=False,save=True,training_size=training_size)
+                               ,do_show=show, verbose=True,save=True,training_size=training_size)
     return
 
 
