@@ -87,7 +87,7 @@ def plot_GPs(two_d=True, one_d=False, one_d_first=True, one_d_second=False):
         ax[0].set_ylabel("Target y")
 
         ax[1].scatter(x2,y2)
-        ax[1].plot(X_pred3_nonzeros,y_pred[2*npoints:], color="orange")
+        ax[1].plot(X_pred2_nonzeros,y_pred[2*npoints:], color="orange")
         ax[1].set_xlabel("y-axis (second feature axis)")
         ax[1].set_ylabel("Target y")
         ax[1].set_ylim([-y[1],y[1]])
@@ -100,7 +100,7 @@ def plot_GPs(two_d=True, one_d=False, one_d_first=True, one_d_second=False):
         # Miss 3D scatterplot toevoegen? --> y_pred[observations:2*observations]
         # fig2 = plt.figure()
         # axnew = fig2.add_subplot(projection='3d')
-        # axnew.scatter(X_pred1_nonzeros, X_pred3_nonzeros, y_pred[observations:2*observations], label="Predicited data")
+        # axnew.scatter(X_pred1_nonzeros, X_pred2_nonzeros, y_pred[observations:2*observations], label="Predicited data")
         # axnew.scatter(X_train1, X_train3, y, label="Training data")
         # axnew.set_xlabel('x')
         # axnew.set_ylabel('y')
@@ -142,7 +142,7 @@ def plot_GPs(two_d=True, one_d=False, one_d_first=True, one_d_second=False):
             ax[0].set_xlabel("x-axis (first feature axis)")
             ax[0].set_ylabel("Target y")
             ax[0].set_ylim([-1,1])
-            # print(X_pred3_nonzeros)
+            # print(X_pred2_nonzeros)
             # print(y2)
             # print(y_pred)
 
@@ -178,14 +178,15 @@ X_pred1 = np.vstack([X_pred1_nonzeros, X_pred1_nonzeros, X_pred1_zeros])
 print(X_pred1_nonzeros.shape)
 # print(X_train1)
 
-X_pred3_zeros = create_pred_locations(X_train[:,1], points=npoints, zeros=True, offset=0.2)
-X_pred3_nonzeros = create_pred_locations(X_train[:,1], points=npoints, zeros=False, offset=0.2)
-X_pred3 = np.vstack([X_pred3_zeros, X_pred3_nonzeros, X_pred3_nonzeros])
-X_pred = np.hstack([X_pred1,X_pred3])  # (3*observations,2)
+X_pred2_zeros = create_pred_locations(X_train[:,1], points=npoints, zeros=True, offset=0.2)
+X_pred2_nonzeros = create_pred_locations(X_train[:,1], points=npoints, zeros=False, offset=0.2)
+X_pred2 = np.vstack([X_pred2_zeros, X_pred2_nonzeros, X_pred2_nonzeros])
+X_pred = np.hstack([X_pred1,X_pred2])  # (3*observations,2)
 
-one_d_first = False
-one_d_second = False
-two_d = True
+# Do regression
+one_d_first = False  # Regression with 1 input variable (--> feature 1)
+one_d_second = False  # Regression with 1 input variable (--> feature 1)
+two_d = True  # Regression with 2 input variables (--> features 1 and 2)
 
 if one_d_first:
     # Define the kernel function
@@ -213,7 +214,7 @@ elif one_d_second:
 
     # You have to pass 2D arrays for fit and predict functions!
     gpr = GaussianProcessRegressor(kernel=kernel,random_state=0).fit(x2,y2)
-    y_pred = gpr.predict(X_pred3_nonzeros)
+    y_pred = gpr.predict(X_pred2_nonzeros)
 
     # Obtain the hyperparameters
     hyperparameters = np.array(kernel.theta)
@@ -226,19 +227,15 @@ elif one_d_second:
 elif two_d:
     # Define the kernel function
     kernel = 1.0 * RBF(length_scale=[1e0, 1e0], length_scale_bounds=(1e-5, 1e10)) + WhiteKernel(
-        noise_level=1e-1, noise_level_bounds=(1e-10, 1e1)
+        noise_level=1e-1, noise_level_bounds=(1e-10, 1e1)  # Whitekernel explains the noise of the signal
     )
 
     # You have to pass 2D arrays for fit and predict functions!
-    gpr = GaussianProcessRegressor(kernel=kernel,random_state=0, n_restarts_optimizer=0).fit(X_train,y)
+    gpr = GaussianProcessRegressor(kernel=kernel,random_state=0, n_restarts_optimizer=0).fit(X_train,y)  # GaussianProcessRegressor is a class
     y_pred = gpr.predict(X_pred)
 
     # Obtain the hyperparameters
-    hyperparameters = np.array(kernel.theta)
-    hyperparameters = 10**hyperparameters
-    print(f"The hyperparameters sigma_f, l2 and noise level are respectively: {hyperparameters}\n")
-    print(f"The hyperparameter names are {kernel.hyperparameters}\n")
-    print(gpr.kernel_)
+    print(f"The kernel is {gpr.kernel_}\n")
 
     plot_GPs(two_d=True,one_d=False, one_d_first=False, one_d_second=False)
 
