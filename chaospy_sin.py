@@ -23,5 +23,8 @@ plt.scatter(*samples)
 plt.show()
 
 # Create polynomial expansion
-expansion = chaospy.generate_expansion(1, joint)
+expansion = chaospy.generate_expansion(2, joint)
+
+# Fit expansion to data
+sin_approx = chaospy.fit_regression(expansion, samples, evaluations)
 
