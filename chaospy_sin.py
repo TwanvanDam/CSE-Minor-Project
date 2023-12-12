@@ -28,3 +28,10 @@ expansion = chaospy.generate_expansion(2, joint)
 # Fit expansion to data
 sin_approx = chaospy.fit_regression(expansion, samples, evaluations)
 
+# Visualize approximation
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+ax.scatter(*samples, sin_approx(*samples), label="approximation")
+ax.scatter(*samples, evaluations, label="truth")
+fig.legend()
+plt.show()
