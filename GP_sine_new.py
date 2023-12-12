@@ -1,3 +1,10 @@
+# GP regression on sine surface
+
+# Create dataset for sine wave surface, possibly add some noise
+# Train the GP model
+# Look at the length_scales
+
+
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,12 +41,12 @@ class ground_truth:
 
 # ===================== Start main code =====================
 
-noise = 0.1
+noise = 0.5
 true_func = ground_truth(noise=noise)
 npoints_truth = 30  # Number of ground_truth points in 1D
 
-npoints_obs = 25  # Number of observations in 1D
-npoints_pred = 50  # Number of predictions in 1D
+npoints_obs = 50  # Number of observation points in 2D
+npoints_pred = 500  # Number of prediction points in 2D
 begin = 0; end = 10
 
 # Create the ground truth points
@@ -65,12 +72,8 @@ x_pred = rng.uniform(begin, end, (2, npoints_pred))
 x_pred1 = x_pred[0]
 x_pred2 = x_pred[1]
 
-# Reshape the 2D arrays into 1D arrays 
-# --> needed for GP predict function
-xx_pred1, xx_pred2 = np.meshgrid(x_pred1, x_pred2)
-xx_pred1_L = xx_pred1.reshape(-1, 1)
-print(xx_pred1_L.shape)
-xx_pred2_L = xx_pred2.reshape(-1, 1)
+xx_pred1_L = x_pred1.reshape(-1, 1)
+xx_pred2_L = x_pred2.reshape(-1, 1)
 xx_pred_L = np.hstack([xx_pred1_L, xx_pred2_L])
 
 kernel = 1.0 * RBF(length_scale=[1, 1], length_scale_bounds=(1e-5, 1e10)) + WhiteKernel(
@@ -84,12 +87,12 @@ y_pred, sig = gpr.predict(xx_pred_L, return_std=True)
 fig1 = plt.figure()
 axnew = fig1.add_subplot(projection='3d')
 # surf = axnew.plot_surface(xx_truth1, xx_truth2, y_truth,
-#                           color="blue", linewidth=0,
+#                           color="cyan", linewidth=0,
 #                           label="Ground truth", antialiased=False)  # Plot the surface
-# axnew.scatter(xx_truth1, xx_truth2, y_truth, color="blue",
+# axnew.scatter(xx_truth1, xx_truth2, y_truth, color="cyan",
 #               label="Ground truth")                                 # Scatter plot the ground truth
 axnew.scatter(x_obs1, x_obs2, y_obs_1d, color="green", label="Observations")
-axnew.scatter(xx_pred1, xx_pred2, y_pred, color="orange", label="Predictions")
+axnew.scatter(x_pred1, x_pred2, y_pred, color="orange", label="Predictions")
 plt.title(
     (
         f"Initial: {kernel}\nOptimum: {gpr.kernel_}\nLog-Marginal-Likelihood: "
@@ -105,12 +108,12 @@ fig2 = plt.figure()
 axnew = fig2.add_subplot(projection='3d')
 axnew = fig2.add_subplot(projection='3d')
 surf = axnew.plot_surface(xx_truth1, xx_truth2, y_truth,
-                          color="blue", linewidth=0,
-                          label="Ground truth", antialiased=False)  # Plot the surface
-# axnew.scatter(xx_truth1, xx_truth2, y_truth, color="blue",
-#               label="Ground truth")                                 # Scatter plot the ground truth
+                          color="cyan", linewidth=0,
+                          label="Ground truth")  # Plot the surface
+# axnew.scatter(xx_truth1, xx_truth2, y_truth, color="cyan",
+#               label="Ground truth")                               # Scatter plot the ground truth
 axnew.scatter(x_obs1, x_obs2, y_obs_1d, color="green", label="Observations")
-axnew.scatter(xx_pred1, xx_pred2, y_pred, color="orange", label="Predictions")
+axnew.scatter(x_pred1, x_pred2, y_pred, color="orange", label="Predictions")
 fig2_manager = plt.get_current_fig_manager()
 fig2_manager.window.geometry("+1000+100")  # Set the spawn location for the second figure
 
