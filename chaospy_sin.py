@@ -2,6 +2,7 @@ import numpy as np
 import chaospy
 import matplotlib.pyplot as plt
 import csv
+from sklearn.metrics import mean_squared_error
 
 noise_level = 0.1
 
@@ -44,10 +45,20 @@ expansion = chaospy.generate_expansion(2, joint, rule="gram_schmidt")
 # Fit expansion to data using least squares
 sin_approx = chaospy.fit_regression(expansion, samples, evaluations)
 
+# Calculate approximate evaluations
+evaluations_approx = sin_approx(*samples)
+
+# Calculate error 
+error = np.sqrt(mean_squared_error(truth, evaluations_approx))
+print(f"rmse: {error}")
+
+print("expansion:")
+print(sin_approx.round(4))
+
 # Visualize approximation
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
-ax.scatter(*samples, sin_approx(*samples), label="approximation")
+ax.scatter(*samples, evaluations_approx, label="approximation")
 ax.scatter(*samples, evaluations, label="truth + noice")
 fig.legend()
 plt.show()
