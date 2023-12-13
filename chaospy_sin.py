@@ -30,8 +30,10 @@ truth = evaluations
 rng = np.random.default_rng(1234)
 evaluations = evaluations + noise_level * rng.uniform(-1, 1, size=evaluations.shape)
 
-# Approximate distribution from data using KDE
-joint = chaospy.GaussianKDE(samples)
+# Approximate distribution from data using KDE (assuming sample variables are independent)
+x = chaospy.GaussianKDE(samples[0])
+y = chaospy.GaussianKDE(samples[1])
+joint = chaospy.J(x, y)
 
 # Visualize distribution and sample points
 grid = np.mgrid[0:np.pi:100j, 0:np.pi:100j]
