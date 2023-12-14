@@ -4,3 +4,13 @@ data/FEMResults/Weird_Data/*.csv
 *.txt
 Results/Plots/*
 Results/Good and bad examples/*
+*.bak
+*.ini
+max_derivative_ML (1).py
+max_derivative_ML_original.py
+better_deriv.py
+classic_yield.py
+classic_yield.py
+GPs.py
+faster_plot.py
+classic_yield.py

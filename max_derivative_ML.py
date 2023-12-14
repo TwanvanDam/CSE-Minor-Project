@@ -4,9 +4,13 @@ import pylab as P
 import numpy as np
 import torch
 import gpytorch
+import matplotlib
+matplotlib.use('TkAgg')  # Use a different backend, like TkAgg
 import matplotlib.pyplot as plt
 import time
 from alive_progress import alive_bar
+from scipy.signal import savgol_filter
+ 
 
 def parseCsvFile(filename, column_keys=None,verbose=True):
     ''' Read info from csv file '''
@@ -80,33 +84,9 @@ def thieleInterpolator(x, y):
         return y[0] + (xin-x[0]) / (rho0[1]+a)
     return t
 
-def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=True,verbose=True,save=False,training_size=100):
-    ''' Return location (in strain) of maximum of energy derivative
-        by approximating the Energy with Gaussian Process (which is now derivable)
-        in order to find a precise location (on the approximation)
-    '''
-    data = parseCsvFile(csv_filename,verbose=verbose)
-    loading_vel = 1 #mm/min
-    sample_height = 1 #mm
-    sample_diameter = 1 #mm
-    # recording_interval = 2 #s
-    strain_adjust = 0 #0.01647
-    area = math.pi*pow(sample_diameter/2,2)
-
-    #Iterations of bayesian regression (loss should be minimal)
-    training_iter = 500
-
-    strain_array = np.array(data['time'])/max(np.array(data['time']))
-    stress_array = -np.array(data['stress_11_top'])/max(-np.array(data['stress_11_top'])) #Normalized stress array
-    energy_array = strain_array * stress_array
-
-    der_energy_array = []
-    ##discrete derivative
-    for i in range(0,len(energy_array)-1):
-      der_energy_array.append((energy_array[i+1]-energy_array[i])/(strain_array[i+1]-strain_array[i]))
-
-    train_x = torch.from_numpy(strain_array).float()
-    train_y = torch.from_numpy(energy_array).float()
+def gps_without_grad(strain,stress,training_iter=600,verbose=True):
+    train_x = torch.from_numpy(strain).float()
+    train_y = torch.from_numpy(stress/np.mean(stress)).float()
 
     # We will use the simplest form of GP model, exact inference
     class ExactGPModel(gpytorch.models.ExactGP):
@@ -121,7 +101,7 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
             return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
     # initialize likelihood and model
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()#noise_constraint=gpytorch.constraints.Interval(1e-1,1e1))
+    likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=gpytorch.constraints.Interval(1e-7,1e3))
     model = ExactGPModel(train_x, train_y, likelihood)
 
     # Find optimal model hyperparameters
@@ -144,10 +124,10 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
         loss = -mll(output, train_y)
         loss.backward()
         if verbose:
-            print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
-            i + 1, training_iter, loss.item(),
-            model.covar_module.base_kernel.lengthscale.item(),
-            model.likelihood.noise.item()
+            print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.8f' % (
+                i + 1, training_iter, loss.item(),
+                model.covar_module.base_kernel.lengthscale.item(),
+                model.likelihood.noise.item()
         ))
         optimizer.step()
 
@@ -155,94 +135,21 @@ def computeMaxEnergyDerivative(fig_filename, csv_filename, degree=10, do_show=Tr
     model.eval()
     likelihood.eval()
 
-    test_x = torch.linspace(0, 1, 100)
+    test_x = torch.linspace(0, 0.15, 250)
 
     # Test points are regularly spaced along [0,1]
     # Make predictions by feeding model through likelihood
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         observed_pred = likelihood(model(test_x))
 
-    """if do_show or save:
-        with torch.no_grad():
-            # Initialize plot
-            f, ax = plt.subplots(1, 1, figsize=(12, 9))
-    
-            # Get upper and lower confidence bounds
-            lower, upper = observed_pred.confidence_region()
-            # Plot training data as black stars
-            ax.plot(train_x.numpy(), train_y.numpy(), 'k*')
-            # Plot predictive means as blue line
-            mean = observed_pred.mean.numpy()
-            ax.plot(test_x.numpy(), mean, 'b')
-            # Shade between the lower and upper confidence bounds
-            ax.fill_between(test_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5)
-            # ax.set_ylim([-3, 3])
-            ax.set_xlim([min(train_x.numpy())-0.05,max(train_x.numpy())+0.05])
-            ax.set_ylim([min(train_y.numpy())-0.05,max(train_y.numpy())+0.05])
-            ax.legend(['Observed Data', 'Mean', 'Confidence'])
-            if save:
-                plt.savefig("Results/Plots/Confidence/Confidence"+fig_filename,dpi=300)
-            if do_show:
-                plt.show()
-            if not do_show:
-                plt.close()"""
-
     # test_x = torch.linspace(0.02, 0.04, 1000)
     X = torch.autograd.Variable(torch.Tensor(test_x), requires_grad=True)
+
     observed_pred = likelihood(model(X))
 
-    y = observed_pred.mean.sum()
-    y.backward()
-    dydtest_x = X.grad
+    y = observed_pred.mean.detach().numpy()
+    return test_x.numpy(), y*np.mean(stress)
 
-    ##Outputs
-    test_x_np = test_x.numpy()
-    derivative = dydtest_x.numpy()
-    i_max = np.argmax(derivative)
-
-    strain_array_true = strain_array * max(np.array(data['time']))/sample_height #- 0.006384
-    test_x_np_true = test_x_np * max(np.array(data['time']))/sample_height #- 0.006384
-    stress_array_true = stress_array * max(-np.array(data['stress_11_top'])) * 1000 / area #TODO multiplication factor
-    
-    gp_stress = (observed_pred.mean.detach().numpy()/ test_x) * (max(-np.array(data['stress_11_top']))) * 1000 / area
-    
-    if do_show or save:
-        fig = P.figure(figsize=[6.4, 8])
-        # first subplot: strain-stress
-        ax = fig.add_subplot(211)
-        plt.subplots_adjust(bottom=0.08, top=0.95, hspace=0.1)
-        plt.plot(strain_array_true, stress_array_true, '.',label="Observed Data",color=(0.5, 0.5, 0.5))
-        plt.plot(test_x_np_true,gp_stress,'-',label="GP approximation",color=(0, 0, 0))
-        plt.axvline(x=test_x_np_true[i_max])
-        plt.axvline(x=0.001*training_size,color='red',label='training window')
-        # plt.xlim(0,0.040)
-        plt.ylim(0,max(stress_array_true))
-        plt.ylabel('Top stress (MPa)', fontsize=15)
-        plt.legend()
-        # Second subplot: derivative energy (approximation)
-        ax = fig.add_subplot(212)
-        plt.plot(strain_array_true[:-1], der_energy_array, color=(0.5, 0.5, 0.5), linewidth=0.8, linestyle='solid', label='Raw discrete derivative')
-        plt.plot(test_x_np_true, derivative, color=(0, 0, 0), linewidth=1.2, linestyle='solid', label='GP approximation derivative')
-        plt.axvline(x=test_x_np_true[i_max])
-        # plt.xlim(0,0.040)
-        # plt.ylim(-20,140)
-        #plt.yticks([])
-        plt.xlabel('Vertical Strain', fontsize=15)
-        plt.ylabel('Mechanical work derivative', fontsize=15)
-        plt.legend()
-    
-        if save:
-            plt.savefig("Results/Plots/Max/"+fig_filename, dpi=300)
-            print('Figure saved as {0}'.format(fig_filename))
-        if do_show:
-            plt.show()
-        if not do_show:
-            plt.close()
-    if i_max > stress_array_true.shape:
-        return None
-    else:
-        return stress_array_true[i_max]
-    
 def computeMaxEnergyDerivative2(fig_filename, csv_filename, degree=10, do_show=True,confidence=False,training_size=100,verbose=True,iterations=500):
     ''' Return location (in strain) of maximum of energy derivative
         by approximating the Energy with Gaussian Process (which is now derivable)
@@ -267,6 +174,9 @@ def computeMaxEnergyDerivative2(fig_filename, csv_filename, degree=10, do_show=T
     ##discrete derivative
     for i in range(0,len(energy_array)-1):
       der_energy_array.append((energy_array[i+1]-energy_array[i])/(strain_array[i+1]-strain_array[i]))
+
+    window_size = 11  # Increase the window size until smooth
+    der_energy_array_smoothed = savgol_filter(energy_array, window_size, 2, deriv=1, delta=strain_array[1]-strain_array[0])
 
     train_x = torch.from_numpy(strain_array[:training_size]).float()
     train_y = torch.from_numpy(energy_array[:training_size]).float()
@@ -318,80 +228,83 @@ def computeMaxEnergyDerivative2(fig_filename, csv_filename, degree=10, do_show=T
     model.eval()
     likelihood.eval()
 
-    test_x = torch.linspace(0, 1, 250)
+    test_x = torch.linspace(0, 1, 500)
 
     # Test points are regularly spaced along [0,1]
     # Make predictions by feeding model through likelihood
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         observed_pred = likelihood(model(test_x))
-    """
-    if confidence:
-        with torch.no_grad():
-            # Initialize plot
-            f, ax = plt.subplots(1, 1, figsize=(4, 3))
-    
-            # Get upper and lower confidence bounds
-            lower, upper = observed_pred.confidence_region()
-            # Plot training data as black stars
-            ax.plot(train_x.numpy(), train_y.numpy(), 'k*')
-            # Plot predictive means as blue line
-            ax.plot(test_x.numpy(), observed_pred.mean.numpy(), 'b')
-            # Shade between the lower and upper confidence bounds
-            ax.fill_between(test_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5)
-            # ax.set_ylim([-3, 3])
-            ax.legend(['Observed Data', 'Mean', 'Confidence'])
-    
-            plt.show()"""
 
     # test_x = torch.linspace(0.02, 0.04, 1000)
     X = torch.autograd.Variable(torch.Tensor(test_x), requires_grad=True)
+
     observed_pred = likelihood(model(X))
 
     y = observed_pred.mean.sum()
-    y.backward()    
-    dydtest_x = X.grad
+    torch.autograd.backward(y, retain_graph=True)
+    dydX = torch.autograd.grad(y, X, create_graph=True)[0]
 
+    # Calculate the second derivative
+    d2ydX2 = torch.autograd.grad(dydX.sum(), X, create_graph=True)[0]
     ##Outputs
-    test_x_np = test_x.numpy()
-    derivative = dydtest_x.numpy()
+    test_x_np = X.detach().numpy()
+    derivative = dydX.detach().numpy()
+    secondderivative = d2ydX2.detach().numpy()
     
+    secondderivative /= max(secondderivative[20:100])
+    
+    max_second = close_to_zero_algorithm(secondderivative)
+
     i_max = np.argmax(derivative[:100])
 
     strain_array_true = strain_array * max(np.array(data['time']))/sample_height #- 0.006384
     test_x_np_true = test_x_np * max(np.array(data['time']))/sample_height #- 0.006384
     stress_array_true = stress_array * max(-np.array(data['stress_11_top'])) * 1000 / area
     
-    gp_stress = (observed_pred.mean.detach().numpy()/ test_x) * (max(-np.array(data['stress_11_top']))) * 1000 / area
+    #gp_stress = (observed_pred.mean.detach().numpy()/ test_x) * (max(-np.array(data['stress_11_top']))) * 1000 / area
     
-    yield_strain1, offset_stress1 = get_yield(stress_array_true, strain_array_true,offset=0.001)
+    #yield_strain1, offset_stress1 = get_yield(stress_array_true, strain_array_true,offset=0.001)
     yield_strain2, offset_stress2 = get_yield(stress_array_true, strain_array_true,offset=0.002)
-    yield_strain2gp, offset_stress2gp = get_yield(gp_stress,test_x_np_true,offset=0.002)
     
-    """
+    gp_interpolated_strain, gp_interpolated_stress = gps_without_grad(strain_array_true,stress_array_true,verbose=verbose)
+
+    yield_strain2gp, offset_stress2gp = get_yield(gp_interpolated_stress,gp_interpolated_strain,offset=0.002,slope=(stress_array_true[10]-stress_array_true[0])/(strain_array_true[10]-strain_array_true[0]))
+    yield_stress2gp = gp_interpolated_stress[gp_interpolated_strain==yield_strain2gp][0]
+    
+    
     fig = P.figure(figsize=[6.4, 8])
     # first subplot: strain-stress
     ax = fig.add_subplot(211)
     plt.subplots_adjust(bottom=0.08, top=0.95, hspace=0.1)
+    plt.xlim([0,0.15])
     plt.plot(strain_array_true, stress_array_true, '.',label="FEM datapoints",color=(0.5,0.5,0.5))
-    plt.plot(test_x_np_true,gp_stress,'k-',label="GP approximation")
-    plt.plot(strain_array_true[:int(1500*yield_strain2)],offset_stress2[:int(1500*yield_strain2)],label=f"offset stress",color=(0.5,0.5,0.5))
-    plt.axvline(x=test_x_np_true[i_max],label="GP yield point",color='r')
-    plt.axvline(yield_strain1,label="Classic 0.1% yield point",color='g')
-    plt.axvline(yield_strain2,label="Classic 0.2% yield point",color='b')
+    plt.plot(gp_interpolated_strain,gp_interpolated_stress,'k-',label="GP approximation to FEM datapoints")
+    plt.plot(gp_interpolated_strain[gp_interpolated_strain<0.5*np.max(gp_interpolated_strain)],offset_stress2gp[gp_interpolated_strain<0.5*np.max(gp_interpolated_strain)],'-',label="Offset stress")
+    #plt.plot(strain_array_true[:int(1500*yield_strain2)],offset_stress2[:int(1500*yield_strain2)],label=f"offset stress",color=(0,0,1))
+    #plt.axvline(x=test_x_np_true[i_max],label="GP yield point",color='r')
+    plt.axvline(yield_strain2gp,label="Classic 0.2% yield point",color='green')
+    #plt.axvline(yield_strain1,label="Classic 0.1% yield point",color='g')
+    #plt.axvline(yield_strain2,,color='b')
     # plt.xlim(0,0.040)
     # plt.ylim(0,40)
     plt.ylabel('Top stress (MPa)', fontsize=15)
     plt.legend()
     # Second subplot: derivative energy (approximation)
     ax = fig.add_subplot(212)
+    plt.axhline(0,linewidth=0.5,color='k')
+    plt.xlim([0,0.15])
     plt.plot(strain_array_true[:-1], der_energy_array, color=(0.5, 0.5, 0.5), linewidth=0.8, linestyle='solid', label='Raw discrete derivative')
-    plt.plot(test_x_np_true[:100], derivative[:100], color=(0, 0, 0), linewidth=1.2, linestyle='solid', label='GP approximation')
-    plt.axvline(x=test_x_np_true[i_max],label="GP yield point",color='r')
-    plt.axvline(yield_strain1,label="Classic 0.1% yield point",color='g')
-    plt.axvline(yield_strain2,label="Classic 0.2% yield point",color='b')
+    plt.plot(test_x_np_true[:100], derivative[:100], 'k',linestyle='solid', label='GP approximation first derivative')
+    plt.plot(strain_array_true, der_energy_array_smoothed,linestyle='dashdot', label='Smoothed discrete derivative')
+    plt.plot(test_x_np_true[20:150], secondderivative[20:150], linestyle='--',color='k', label='GP approximation second derivative')
+    plt.axvline(x=test_x_np_true[i_max],label="max first derivative",color='r')
+    plt.axvline(x=test_x_np_true[max_second],label="second derivative"+r"$\approx0$",color='orange')
+    plt.axvline(yield_strain2gp,label="Classic 0.2% yield point",color='green')
+    #plt.axvline(yield_strain1,label="Classic 0.1% yield point",color='g')
+    #plt.axvline(yield_strain2,label="Classic 0.2% yield point",color='b')
     # plt.xlim(0,0.040)
     # plt.ylim(-20,140)
-    plt.yticks([])
+    plt.yticks([0])
     plt.xlabel('Vertical Strain', fontsize=15)
     plt.ylabel('Mechanical work derivative', fontsize=15)
     plt.legend()
@@ -401,12 +314,21 @@ def computeMaxEnergyDerivative2(fig_filename, csv_filename, degree=10, do_show=T
         print(f'Figure saved as {fig_filename}')
         plt.close()
     else:
-        plt.show()"""
-    return stress_array_true[i_max], stress_array_true[strain_array_true==yield_strain1][0], stress_array_true[strain_array_true==yield_strain2][0]
+        plt.show()
+    return stress_array_true[strain_array_true==yield_strain2][0],yield_stress2gp
 
-def get_yield(stress,strain,offset=0.002):
-    slope = (stress[20]-stress[0])/(strain[20]-strain[0])
+def close_to_zero_algorithm(array):
+    smallest_value = 20+np.argmin(np.abs(array[20:120]))
+    return smallest_value
 
+def get_yield(stress,strain,offset=0.002,discrete=True,slope=None):
+    if slope == None:
+        if discrete:
+            slope = (stress[10]-stress[0])/(strain[10]-strain[0])
+        else:
+            slope = (stress[20]-stress[0])/(strain[20]-strain[0])
+    else:
+        slope = slope
     offset_stress = slope*(strain-offset)
 
     yield_index = np.argmin(np.abs(stress-offset_stress))
@@ -423,17 +345,17 @@ def output_yield_points(output_title,start,end):
                 i += 1
                 if (i > start) and (i <= end):
                     if csv_filename != "Weird_Data":
-                        yield_point = computeMaxEnergyDerivative('fig_exp_protocol.eps', csv_filename, do_show=False,verbose=False,save=False)
+                        yield_point = computeMaxEnergyDerivative2('fig_exp_protocol.eps', csv_filename, do_show=False,verbose=False,save=False)[1]
                         if yield_point != None: 
                             output.writelines(f"{csv_filename}, {yield_point:.2f}\n")
                         else:   #If the yield point cannot be determined move the file to a different folder.
                             output.writelines(f"{csv_filename}, yield = None, {time.time()-start:.1f}\n") 
                             os.rename(data_dir+csv_filename,data_dir+"Weird_Data/"+csv_filename)
                     bar()
-def make_plots(filename,show=True,training_size=100,verbose=True,confidence=False,iterations=500):
-    gpyield, yield_stress1, yield_stress2 = computeMaxEnergyDerivative2(filename.replace(".csv",".png"),filename,training_size=training_size,verbose=verbose,do_show=show,confidence=confidence,iterations=iterations)
-    return gpyield, yield_stress1, yield_stress2
 
+def make_plots(filename,show=True,training_size=100,verbose=True,confidence=False,iterations=500):
+    yield_stress2, gpyield = computeMaxEnergyDerivative2(filename.replace(".csv",".png"),filename,training_size=training_size,verbose=verbose,do_show=show,confidence=confidence,iterations=iterations)
+    return gpyield, yield_stress2
 
 if __name__ == '__main__':
     data_dir = "./data/FEMResults/" #Put the data in this directory
@@ -448,10 +370,8 @@ if __name__ == '__main__':
         output_title = sys.argv[3]
     #print(f"Calculating yield points for files {start_file} - {end_file} in the data directory and saving in "+output_title)
     #output_yield_points(output_title,start_file,end_file)
-    
-    sum1 = 0
-    sum2 = 0
-    all = True
+
+    all = False
     
     if all:
         with open("output.txt",'w') as output:
@@ -459,18 +379,9 @@ if __name__ == '__main__':
                 print(len(os.listdir(data_dir)))
                 for file in os.listdir(data_dir)[start_file:end_file]:
                     if file != "Weird_Data":
-                        gpyield, yield1, yield2 = make_plots(file,show=False,training_size=100,verbose=verbose)
-                        print(f"gp predicts:{gpyield}, 0.1% ofsset:{yield1}, 0.2 %offset:{yield2}")
-                        output.writelines(f"{file}, {yield2}\n")
-                        sum2 += abs(gpyield - yield2)
-                        sum1 += abs(gpyield - yield1)
+                        gpyield,yield2 = make_plots(file,show=False,training_size=100,verbose=verbose)
+                        print(f"gp predicts:{gpyield}, discrete points:{yield2}")
+                        output.writelines(f"{file}, {gpyield}\n")
                     bar()
     else:
-        make_plots("Scan001_005.csv",training_size=200,confidence=True,iterations=500)
-
-
-#TODO
-#export data for machine learning. Done
-#find nice datasets Done
-#compare to bad ones Done
-#optimize hyperparamters
+        make_plots("Scan001_002.csv",training_size=100,confidence=True,iterations=300,verbose=False)
