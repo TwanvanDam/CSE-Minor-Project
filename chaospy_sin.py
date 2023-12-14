@@ -50,6 +50,12 @@ sin_approx = chaospy.fit_regression(expansion, samples, evaluations)
 # Calculate approximate evaluations
 evaluations_approx = sin_approx(*samples)
 
+# Get sobol indices
+print("First order Sobol indices")
+print(chaospy.Sens_m(sin_approx, joint))
+print("Second order Sobol indices")
+print(chaospy.Sens_m2(sin_approx, joint))
+
 # Calculate error 
 error = np.sqrt(mean_squared_error(truth, evaluations_approx))
 print(f"rmse: {error}")
