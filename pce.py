@@ -3,7 +3,7 @@ import chaospy
 import csv
 
 def read_data(sample_fieldnames, evaluation_fieldname, path):
-    samples = [[] for i in range(len(sample_fieldnames))]
+    samples = [[] for _ in sample_fieldnames]
     evaluations = []
     with open(path, "r") as csv_file:
         reader = csv.DictReader(csv_file)
@@ -17,3 +17,8 @@ def read_data(sample_fieldnames, evaluation_fieldname, path):
     return samples, evaluations
 
 samples, evaluations  = read_data(["x", "y"], "sin(x)", "data/sin_data.csv")
+
+# Approximate distribution from data using KDE (assume independent variables)
+variables = [chaospy.GaussianKDE(sample) for sample in samples]
+joint = chaospy.J(*variables)
+
