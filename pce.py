@@ -44,3 +44,15 @@ errors = [mean_squared_error(evaluations_validate, evaluations_val_approx)
 # print order and rmse
 for order, error in zip(orders, errors):
     print(f"order: {order}, rmse: {math.sqrt(error)}")
+
+# Get lowest error order
+best_order_arg = np.argmin(errors)
+best_order = orders[best_order_arg]
+best_approx = approxs[best_order_arg]
+print(f"\nSelected order {best_order} to calculate Sobol indices")
+
+# Calculate Sobol indices
+print("First order Sobol indices")
+print(chaospy.Sens_m(best_approx, joint))
+print("Second order Sobol indices")
+print(chaospy.Sens_m2(best_approx, joint))
