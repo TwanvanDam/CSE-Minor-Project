@@ -22,3 +22,7 @@ samples, evaluations  = read_data(["x", "y"], "sin(x)", "data/sin_data.csv")
 variables = [chaospy.GaussianKDE(sample) for sample in samples]
 joint = chaospy.J(*variables)
 
+# Create polynomial expansion
+max_order = 10
+expansion = [chaospy.generate_expansion(order, joint) for order in range(max_order)]
+
