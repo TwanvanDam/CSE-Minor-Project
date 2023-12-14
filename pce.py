@@ -24,5 +24,7 @@ joint = chaospy.J(*variables)
 
 # Create polynomial expansion
 max_order = 10
-expansion = [chaospy.generate_expansion(order, joint) for order in range(max_order)]
+expansions = [chaospy.generate_expansion(order, joint) for order in range(max_order)]
 
+# Fit expansion to data
+approx = [chaospy.fit_regression(expansion, samples, evaluations) for expansion in expansions]
