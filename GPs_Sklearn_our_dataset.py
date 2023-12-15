@@ -137,8 +137,8 @@ def all_features():
     # Print hyperparameters
     # print(f"Initial: {kernel}\nOptimum: {gpr.kernel_}\nLog-Marginal-Likelihood: ")
     # print(f"{gpr.log_marginal_likelihood(gpr.kernel_.theta)}")
-    print(f"The log hyperparameters [Scaling factor, length_scales, noise] are \n 
-          {gpr.kernel_.theta}")
+    print(f"The log hyperparameters [Scaling factor, length_scales, noise] are \n"
+          "{gpr.kernel_.theta}")
     log_hyperparameters = gpr.kernel_.theta  # Numpy array
     log_length_scales = log_hyperparameters[1:-1]
 
@@ -157,4 +157,7 @@ def all_features():
     plt.legend()
     plt.show()
 
-all_features()
+# ===================== Start main code =====================
+two_features()
+
+# all_features()  # Note that the resulting plot has also been uploaded to Github already
