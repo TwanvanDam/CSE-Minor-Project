@@ -4,6 +4,7 @@ import csv
 from sklearn.metrics import mean_squared_error
 import math
 from random import sample
+from pathlib import Path
 
 def read_data(sample_fieldnames, evaluation_fieldname, path):
     samples = [[] for _ in sample_fieldnames]
@@ -19,8 +20,8 @@ def read_data(sample_fieldnames, evaluation_fieldname, path):
     evaluations = np.array(evaluations, dtype=np.float64)
     return samples, evaluations
 
-samples, evaluations  = read_data(["VolumeDensity", "SurfaceAreaDensity", "Volume", "SurfaceArea"], " Yield Stress ", "Results/merged_data.csv")
-split = int(0.2 * samples.shape[1])
+samples, evaluations  = read_data(["Volume", "SurfaceArea", "MeanBreadth", "EulerNumber", "Sphericity"], " Yield Stress ", "Results/merged_data.csv")
+split = int(0.3 * samples.shape[1])
 
 validate_idx = sample(range(samples.shape[1]), split)
 samples_validate = np.take(samples, validate_idx, axis=1)
@@ -34,17 +35,28 @@ variables = [chaospy.GaussianKDE(sample) for sample in samples]
 joint = chaospy.J(*variables)
 
 # Create polynomial expansion
-orders = range(1, 10)
-expansions = [chaospy.generate_expansion(order, joint) for order in orders]
-print("done creating expansions")
+orders = range(1, 5)
+errors = []
 
-# Fit expansion to data
-approxs = [chaospy.fit_regression(expansion, samples, evaluations) for expansion in expansions]
+dir = Path("./pce_expansions")
 
-# Evaluate approximations on evaluation data and calculate error
-evaluations_val_approxs = [approx(*samples_validate) for approx in approxs]
-errors = [mean_squared_error(evaluations_validate, evaluations_val_approx)
-         for evaluations_val_approx in evaluations_val_approxs]
+for order in orders:
+    # Create expansion
+    expansion = chaospy.generate_expansion(order, joint)
+
+    # Fit expansion to data and sample expansion on validation points
+    approx = chaospy.fit_regression(expansion, samples, evaluations)
+    evaluations_val_approx = approx(*samples_validate)
+
+    # Calculate error
+    error = mean_squared_error(evaluations_validate, evaluations_val_approx)
+    errors.append(error)
+
+    # Save expansion to file
+    chaospy.save(dir / f"pce_unfitted_{order}", expansion)
+    chaospy.save(dir / f"pce_fitted_{order}", approx)
+    print(f"saved order {order}")
+
 
 # print order and rmse
 for order, error in zip(orders, errors):
@@ -53,7 +65,8 @@ for order, error in zip(orders, errors):
 # Get lowest error order
 best_order_arg = np.argmin(errors)
 best_order = orders[best_order_arg]
-best_approx = approxs[best_order_arg]
+print(dir / f"pce_fitted_{best_order}")
+best_approx = chaospy.load(dir / f"pce_fitted_{best_order}", allow_pickle=True)
 print(f"\nSelected order {best_order} to calculate Sobol indices")
 
 # Calculate Sobol indices
