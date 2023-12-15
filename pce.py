@@ -3,6 +3,7 @@ import chaospy
 import csv
 from sklearn.metrics import mean_squared_error
 import math
+from random import sample
 
 def read_data(sample_fieldnames, evaluation_fieldname, path):
     samples = [[] for _ in sample_fieldnames]
@@ -18,20 +19,24 @@ def read_data(sample_fieldnames, evaluation_fieldname, path):
     evaluations = np.array(evaluations, dtype=np.float64)
     return samples, evaluations
 
-samples, evaluations  = read_data(["x", "y"], "sin(x)", "data/sin_data.csv")
+samples, evaluations  = read_data(["VolumeDensity", "SurfaceAreaDensity", "Volume", "SurfaceArea"], " Yield Stress ", "Results/merged_data.csv")
 split = int(0.2 * samples.shape[1])
-samples_validate = samples[:,0:split]
-evaluations_validate = evaluations[0:split]
-samples = samples[:,split:]
-evaluations = evaluations[split:]
+
+validate_idx = sample(range(samples.shape[1]), split)
+samples_validate = np.take(samples, validate_idx, axis=1)
+evaluations_validate = np.take(evaluations, validate_idx)
+
+samples = np.delete(samples, validate_idx, axis=1)
+evaluations = np.delete(evaluations, validate_idx)
 
 # Approximate distribution from data using KDE (assume independent variables)
 variables = [chaospy.GaussianKDE(sample) for sample in samples]
 joint = chaospy.J(*variables)
 
 # Create polynomial expansion
-orders = range(10)
+orders = range(1, 10)
 expansions = [chaospy.generate_expansion(order, joint) for order in orders]
+print("done creating expansions")
 
 # Fit expansion to data
 approxs = [chaospy.fit_regression(expansion, samples, evaluations) for expansion in expansions]
