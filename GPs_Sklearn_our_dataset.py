@@ -9,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 # Extract the input and output data
 npoints_obs = 676  # 676 datapoints in total
@@ -16,6 +17,7 @@ dataframe1 = pd.read_excel(r"merged_data1.xlsx")
 
 two_features = False
 multiple_features = not(two_features)
+corr_matrix_flag = False 
 
 if two_features:
     npoints_pred = 50 # Number of prediction points in 1D 
@@ -109,7 +111,7 @@ if two_features:
 
 # Note that the resulting plot has also been uploaded to Github already
 if multiple_features:
-    nfeatures = 4  # Max is 35
+    nfeatures = 16  # Max is 35
     X_train = dataframe1.iloc[:npoints_obs, 1:nfeatures+1]
     X_train = X_train.to_numpy()
 
@@ -133,7 +135,7 @@ if multiple_features:
         noise_level=1e-1, noise_level_bounds=(1e-10, 1e1)
     )
     # kernel = DotProduct() + WhiteKernel()  # Other kernel choice
-    gpr = GaussianProcessRegressor(kernel=kernel,random_state=2).fit(X_train, y_train)
+    gpr = GaussianProcessRegressor(kernel=kernel,random_state=3).fit(X_train, y_train)
 
     # Denormalize
     X_train = Xscaler.inverse_transform(X_train)
@@ -159,5 +161,28 @@ if multiple_features:
 
     plt.xscale("log")
     plt.gca().invert_yaxis()  # labels read top-to-bottom
+
+    plt.title(
+        (
+            f"Initial: {kernel}\nOptimum: {gpr.kernel_}\nLog-Marginal-Likelihood: "
+            f"{gpr.log_marginal_likelihood(gpr.kernel_.theta)}"
+        ),
+        fontsize=8,
+        )
+    
     plt.legend()
     plt.show()
+
+if corr_matrix_flag:
+    plt.figure(figsize=(15,7))
+    corr_matrix = dataframe1.iloc[:, 1:].corr()
+    sns.heatmap(corr_matrix, annot=False, cmap="YlGnBu")
+
+    print(corr_matrix["Yield.Stress"].sort_values(ascending=False))
+
+    plt.show()
+
+'''
+Notes:
+With less features, Y doesn't seem really important. More features? Y becomes more important
+'''
