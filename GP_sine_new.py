@@ -4,7 +4,6 @@
 # Train the GP model
 # Look at the length_scales
 
-
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,9 +44,9 @@ noise = 0.5
 true_func = ground_truth(noise=noise)
 npoints_truth = 30  # Number of ground_truth points in 1D
 
-npoints_obs = 50  # Number of observation points in 2D
+npoints_obs = 150  # Number of observation points in 2D
 npoints_pred = 500  # Number of prediction points in 2D
-begin = 0; end = 10
+begin = 0; end = np.pi
 
 # Create the ground truth points
 x_truth1 = np.linspace(begin, end, npoints_truth)
