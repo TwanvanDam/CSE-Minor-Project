@@ -12,11 +12,14 @@ import pandas as pd
 
 # Extract the input and output data
 npoints_obs = 676  # 676 datapoints in total
-npoints_pred = 50 # Number of prediction points in 1D 
-                   # (so number of prediction points in 2D will be the value squared)
 dataframe1 = pd.read_excel(r"merged_data1.xlsx")
 
-def two_features():
+two_features = False
+multiple_features = not(two_features)
+
+if two_features:
+    npoints_pred = 50 # Number of prediction points in 1D 
+                   # (so number of prediction points in 2D will be the value squared)
     feature1 = 1  # Start from 1, not 0
     feature2 = 2  # Until and included 35
     X_train = dataframe1.iloc[:npoints_obs, [feature1,feature2]]
@@ -104,16 +107,18 @@ def two_features():
     plt.tight_layout()
     plt.show()
 
-def all_features():
-    X_train = dataframe1.iloc[:npoints_obs, 1:-1]
+# Note that the resulting plot has also been uploaded to Github already
+if multiple_features:
+    nfeatures = 4  # Max is 35
+    X_train = dataframe1.iloc[:npoints_obs, 1:nfeatures+1]
     X_train = X_train.to_numpy()
 
     y_train = dataframe1.iloc[:npoints_obs, -1]
     y_train = y_train.to_numpy()
     y_train = y_train.reshape(-1, 1)
 
-    nfeatures = len(dataframe1.columns) - 2  # -2 because the first and last columns are not features
-    feature_names = dataframe1.columns[1:-1]
+    # nfeatures = len(dataframe1.columns) - 2  # -2 because the first and last columns are not features
+    feature_names = dataframe1.columns[1:nfeatures+1]
 
     # Normalizing 
     Xscaler = StandardScaler()  # Standardization initialization for X_train and X_pred (Note: StandardScaler() is a class )
@@ -156,8 +161,3 @@ def all_features():
     plt.gca().invert_yaxis()  # labels read top-to-bottom
     plt.legend()
     plt.show()
-
-# ===================== Start main code =====================
-two_features()
-
-# all_features()  # Note that the resulting plot has also been uploaded to Github already
