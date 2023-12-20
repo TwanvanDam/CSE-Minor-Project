@@ -46,16 +46,39 @@ def train_pce(x_train, y_train, x_test, y_test, orders, save_dir):
 
     return errors, joint
 
+class Kfold:
+    def __init__(self, x, y, k):
+        self.iter_num = 0
+        self.x = x
+        self.y = y
+        self.len_data = y.shape[0]
+        self.k = k
+        self.random_idx = np.array(sample(range(self.len_data), self.len_data))
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.iter_num < self.k:
+            start = int(self.iter_num * self.len_data / self.k)
+            end = int((self.iter_num + 1) * self.len_data / self.k)
+            idx = self.random_idx[start:end]
+            x_test = np.take(self.x, idx, axis=1)
+            y_test = np.take(self.y, idx)
+            x_train = np.delete(self.x, idx, axis=1)
+            y_train = np.delete(self.y, idx)
+            self.iter_num += 1
+            return x_train, y_train, x_test, y_test
+        else:
+            raise StopIteration
+
 fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]
 samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
 split = int(0.3 * samples.shape[1])
 
-validate_idx = sample(range(samples.shape[1]), split)
-samples_validate = np.take(samples, validate_idx, axis=1)
-evaluations_validate = np.take(evaluations, validate_idx)
-
-samples = np.delete(samples, validate_idx, axis=1)
-evaluations = np.delete(evaluations, validate_idx)
+samples, evaluations, samples_validate, evaluations_validate = next(Kfold(samples, evaluations, 5))
+print(samples.shape)
+print(samples_validate.shape)
 
 dir = Path("./pce_expansions")
 
