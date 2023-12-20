@@ -42,7 +42,7 @@ def train_pce(x_train, y_train, x_test, y_test, orders, save_dir):
         # Save expansion to file
         chaospy.save(save_dir / f"pce_unfitted_{order}", expansion)
         chaospy.save(save_dir / f"pce_fitted_{order}", approx)
-        print(f"saved order {order}")
+        print(f"saved order {order}, rmse: {math.sqrt(error)}")
 
     return errors, joint
 
@@ -63,10 +63,6 @@ dir = Path("./pce_expansions")
 orders = range(1, 5)
 
 errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
-
-# print order and rmse
-for order, error in zip(orders, errors):
-    print(f"order: {order}, rmse: {math.sqrt(error)}")
 
 # Get lowest error order
 best_order_arg = np.argmin(errors)
