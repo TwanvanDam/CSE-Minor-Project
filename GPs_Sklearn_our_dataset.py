@@ -15,9 +15,10 @@ import seaborn as sns
 npoints_obs = 676  # 676 datapoints in total
 dataframe1 = pd.read_excel(r"merged_data1.xlsx")
 
+# Flags
 two_features = False
-multiple_features = not(two_features)
-corr_matrix_flag = False 
+multiple_features = False #not(two_features)
+corr_matrix_flag = True
 
 if two_features:
     npoints_pred = 50 # Number of prediction points in 1D 
@@ -179,7 +180,8 @@ if corr_matrix_flag:
     sns.heatmap(corr_matrix, annot=False, cmap="YlGnBu")
 
     print(corr_matrix["Yield.Stress"].sort_values(ascending=False))
-
+    
+    plt.tight_layout()
     plt.show()
 
 '''
