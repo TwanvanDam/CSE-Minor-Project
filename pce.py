@@ -62,6 +62,7 @@ class Kfold:
         if self.iter_num < self.k:
             start = int(self.iter_num * self.len_data / self.k)
             end = int((self.iter_num + 1) * self.len_data / self.k)
+            print(f"start: {start}, end: {end}")
             idx = self.random_idx[start:end]
             x_test = np.take(self.x, idx, axis=1)
             y_test = np.take(self.y, idx)
@@ -76,32 +77,29 @@ fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "Eule
 samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
 split = int(0.3 * samples.shape[1])
 
-samples, evaluations, samples_validate, evaluations_validate = next(Kfold(samples, evaluations, 5))
-print(samples.shape)
-print(samples_validate.shape)
-
 dir = Path("./pce_expansions")
 
 # Create polynomial expansion
 orders = range(1, 5)
 
-errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
+for samples, evaluations, samples_validate, evaluations_validate in Kfold(samples, evaluations, 5):
+    errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
 
-# Get lowest error order
-best_order_arg = np.argmin(errors)
-best_order = orders[best_order_arg]
-print(dir / f"pce_fitted_{best_order}")
-best_approx = chaospy.load(dir / f"pce_fitted_{best_order}", allow_pickle=True)
-print(f"\nSelected order {best_order} to calculate Sobol indices")
+    # Get lowest error order
+    best_order_arg = np.argmin(errors)
+    best_order = orders[best_order_arg]
+    print(dir / f"pce_fitted_{best_order}")
+    best_approx = chaospy.load(dir / f"pce_fitted_{best_order}", allow_pickle=True)
+    print(f"\nSelected order {best_order} to calculate Sobol indices")
 
-# Calculate Sobol indices
-first_sobol = chaospy.Sens_m(best_approx, joint)
-print("First order Sobol indices")
-for name, sobol in zip(fieldnames, first_sobol):
-    print(f"{name:<20}: {sobol:.8f}")
-print("Second order Sobol indices")
-print(chaospy.Sens_m2(best_approx, joint))
-total_sobol = chaospy.Sens_t(best_approx, joint)
-print("Total sobol indices")
-for name, sobol in zip(fieldnames, total_sobol):
-    print(f"{name:<20}: {sobol:.8f}")
+    # Calculate Sobol indices
+    first_sobol = chaospy.Sens_m(best_approx, joint)
+    print("First order Sobol indices")
+    for name, sobol in zip(fieldnames, first_sobol):
+        print(f"{name:<20}: {sobol:.8f}")
+    print("Second order Sobol indices")
+    print(chaospy.Sens_m2(best_approx, joint))
+    total_sobol = chaospy.Sens_t(best_approx, joint)
+    print("Total sobol indices")
+    for name, sobol in zip(fieldnames, total_sobol):
+        print(f"{name:<20}: {sobol:.8f}")
