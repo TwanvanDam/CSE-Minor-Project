@@ -20,7 +20,8 @@ def read_data(sample_fieldnames, evaluation_fieldname, path):
     evaluations = np.array(evaluations, dtype=np.float64)
     return samples, evaluations
 
-samples, evaluations  = read_data(["Volume", "SurfaceArea", "MeanBreadth", "EulerNumber", "Sphericity"], " Yield Stress ", "Results/merged_data.csv")
+fieldnames = ["Volume", "SurfaceArea", "MeanBreadth", "EulerNumber", "Sphericity"]
+samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
 split = int(0.3 * samples.shape[1])
 
 validate_idx = sample(range(samples.shape[1]), split)
@@ -70,7 +71,9 @@ best_approx = chaospy.load(dir / f"pce_fitted_{best_order}", allow_pickle=True)
 print(f"\nSelected order {best_order} to calculate Sobol indices")
 
 # Calculate Sobol indices
+first_sobol = chaospy.Sens_m(best_approx, joint)
 print("First order Sobol indices")
-print(chaospy.Sens_m(best_approx, joint))
+for name, sobol in zip(fieldnames, first_sobol):
+          print(f"{name:<20}: {sobol:.8f}")
 print("Second order Sobol indices")
 print(chaospy.Sens_m2(best_approx, joint))
