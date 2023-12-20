@@ -20,7 +20,7 @@ def read_data(sample_fieldnames, evaluation_fieldname, path):
     evaluations = np.array(evaluations, dtype=np.float64)
     return samples, evaluations
 
-fieldnames = ["Volume", "SurfaceArea", "MeanBreadth", "EulerNumber", "Sphericity"]
+fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]
 samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
 split = int(0.3 * samples.shape[1])
 
@@ -77,3 +77,7 @@ for name, sobol in zip(fieldnames, first_sobol):
           print(f"{name:<20}: {sobol:.8f}")
 print("Second order Sobol indices")
 print(chaospy.Sens_m2(best_approx, joint))
+total_sobol = chaospy.Sens_t(best_approx, joint)
+print("Total sobol indices")
+for name, sobol in zip(fieldnames, total_sobol):
+    print(f"{name:<20}: {sobol:.8f}")
