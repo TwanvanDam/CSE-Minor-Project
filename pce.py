@@ -79,7 +79,7 @@ print(f"\nSelected order {best_order} to calculate Sobol indices")
 first_sobol = chaospy.Sens_m(best_approx, joint)
 print("First order Sobol indices")
 for name, sobol in zip(fieldnames, first_sobol):
-          print(f"{name:<20}: {sobol:.8f}")
+    print(f"{name:<20}: {sobol:.8f}")
 print("Second order Sobol indices")
 print(chaospy.Sens_m2(best_approx, joint))
 total_sobol = chaospy.Sens_t(best_approx, joint)
