@@ -20,6 +20,32 @@ def read_data(sample_fieldnames, evaluation_fieldname, path):
     evaluations = np.array(evaluations, dtype=np.float64)
     return samples, evaluations
 
+
+def train_pce(x_train, y_train, x_test, y_test, orders, save_dir):
+    errors = []
+
+    # Approximate distribution from data using KDE (assume independent variables)
+    variables = [chaospy.GaussianKDE(x) for x in x_train]
+    joint = chaospy.J(*variables)
+    for order in orders:
+        # Create expansion
+        expansion = chaospy.generate_expansion(order, joint)
+
+        # Fit expansion to data and sample expansion on validation points
+        approx = chaospy.fit_regression(expansion, x_train, y_train)
+        evaluations_val_approx = approx(*x_test)
+
+        # Calculate error
+        error = mean_squared_error(y_test, evaluations_val_approx)
+        errors.append(error)
+
+        # Save expansion to file
+        chaospy.save(save_dir / f"pce_unfitted_{order}", expansion)
+        chaospy.save(save_dir / f"pce_fitted_{order}", approx)
+        print(f"saved order {order}")
+
+    return errors, joint
+
 fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]
 samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
 split = int(0.3 * samples.shape[1])
@@ -31,33 +57,12 @@ evaluations_validate = np.take(evaluations, validate_idx)
 samples = np.delete(samples, validate_idx, axis=1)
 evaluations = np.delete(evaluations, validate_idx)
 
-# Approximate distribution from data using KDE (assume independent variables)
-variables = [chaospy.GaussianKDE(sample) for sample in samples]
-joint = chaospy.J(*variables)
+dir = Path("./pce_expansions")
 
 # Create polynomial expansion
 orders = range(1, 5)
-errors = []
 
-dir = Path("./pce_expansions")
-
-for order in orders:
-    # Create expansion
-    expansion = chaospy.generate_expansion(order, joint)
-
-    # Fit expansion to data and sample expansion on validation points
-    approx = chaospy.fit_regression(expansion, samples, evaluations)
-    evaluations_val_approx = approx(*samples_validate)
-
-    # Calculate error
-    error = mean_squared_error(evaluations_validate, evaluations_val_approx)
-    errors.append(error)
-
-    # Save expansion to file
-    chaospy.save(dir / f"pce_unfitted_{order}", expansion)
-    chaospy.save(dir / f"pce_fitted_{order}", approx)
-    print(f"saved order {order}")
-
+errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
 
 # print order and rmse
 for order, error in zip(orders, errors):
