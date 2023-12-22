@@ -30,8 +30,10 @@ truth = evaluations
 rng = np.random.default_rng(1234)
 evaluations = evaluations + noise_level * rng.uniform(-1, 1, size=evaluations.shape)
 
-# Approximate distribution from data using KDE
-joint = chaospy.GaussianKDE(samples)
+# Approximate distribution from data using KDE (assuming sample variables are independent)
+x = chaospy.GaussianKDE(samples[0])
+y = chaospy.GaussianKDE(samples[1])
+joint = chaospy.J(x, y)
 
 # Visualize distribution and sample points
 grid = np.mgrid[0:np.pi:100j, 0:np.pi:100j]
@@ -47,6 +49,12 @@ sin_approx = chaospy.fit_regression(expansion, samples, evaluations)
 
 # Calculate approximate evaluations
 evaluations_approx = sin_approx(*samples)
+
+# Get sobol indices
+print("First order Sobol indices")
+print(chaospy.Sens_m(sin_approx, joint))
+print("Second order Sobol indices")
+print(chaospy.Sens_m2(sin_approx, joint))
 
 # Calculate error 
 error = np.sqrt(mean_squared_error(truth, evaluations_approx))
