@@ -74,7 +74,7 @@ class Kfold:
             raise StopIteration
 
 fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]
-samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
+samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data_clean.csv")
 
 dir = Path("./pce_expansions")
 
