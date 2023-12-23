@@ -75,14 +75,15 @@ class Kfold:
 
 fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]
 samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data.csv")
-split = int(0.3 * samples.shape[1])
 
 dir = Path("./pce_expansions")
 
 # Create polynomial expansion
-orders = range(1, 5)
+orders = range(1, 9)
 
-for samples, evaluations, samples_validate, evaluations_validate in Kfold(samples, evaluations, 5):
+total_sobols = []
+
+for samples, evaluations, samples_validate, evaluations_validate in Kfold(samples, evaluations, 10):
     errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
 
     # Get lowest error order
@@ -103,3 +104,12 @@ for samples, evaluations, samples_validate, evaluations_validate in Kfold(sample
     print("Total sobol indices")
     for name, sobol in zip(fieldnames, total_sobol):
         print(f"{name:<20}: {sobol:.8f}")
+
+    total_sobols.append(total_sobol)
+
+mean_t_sobol = np.mean(total_sobols, axis=0)
+std_t_sobol = np.std(total_sobols, axis=0)
+
+print("total sobol indices for all tests")
+for name, mean, std in zip(fieldnames, mean_t_sobol, std_t_sobol):
+    print(f"{name:<20} mean: {mean:.8f}, std: {std}")
