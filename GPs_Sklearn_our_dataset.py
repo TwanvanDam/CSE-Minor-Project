@@ -12,13 +12,16 @@ import pandas as pd
 import seaborn as sns
 
 # Extract the input and output data
-npoints_obs = 676  # 676 datapoints in total
-dataframe1 = pd.read_excel(r"merged_data1.xlsx")
+# npoints_obs = 676  # 676 datapoints in total
+# dataframe1 = pd.read_excel(r"merged_data1.xlsx")  # Original data
+dataframe1 = pd.read_excel(r"merged_data_clean.xlsx")  # Cleaned data
+npoints_obs = 584  # 584 datapoints in total
 
 # Flags
 two_features = False
-multiple_features = False #not(two_features)
-corr_matrix_flag = True
+multiple_features = not(two_features)
+# multiple_features = False
+corr_matrix_flag = False
 
 if two_features:
     npoints_pred = 50 # Number of prediction points in 1D 
@@ -112,7 +115,7 @@ if two_features:
 
 # Note that the resulting plot has also been uploaded to Github already
 if multiple_features:
-    nfeatures = 16  # Max is 35
+    nfeatures = 4  # Max is 35
     X_train = dataframe1.iloc[:npoints_obs, 1:nfeatures+1]
     X_train = X_train.to_numpy()
 
@@ -132,11 +135,11 @@ if multiple_features:
 
     length_scale = 1e+0 * np.ones(nfeatures)
     # Define the kernel function
-    kernel = 1.0 * RBF(length_scale=length_scale, length_scale_bounds=(1e-5, 1e3)) + WhiteKernel(
+    kernel = 1.0 * RBF(length_scale=length_scale, length_scale_bounds=(1e-5, 1e7)) + WhiteKernel(
         noise_level=1e-1, noise_level_bounds=(1e-10, 1e1)
     )
     # kernel = DotProduct() + WhiteKernel()  # Other kernel choice
-    gpr = GaussianProcessRegressor(kernel=kernel,random_state=3).fit(X_train, y_train)
+    gpr = GaussianProcessRegressor(kernel=kernel,random_state=5, n_restarts_optimizer=100).fit(X_train, y_train)
 
     # Denormalize
     X_train = Xscaler.inverse_transform(X_train)
@@ -149,6 +152,7 @@ if multiple_features:
           "{gpr.kernel_.theta}")
     log_hyperparameters = gpr.kernel_.theta  # Numpy array
     log_length_scales = log_hyperparameters[1:-1]
+    normal_length_scales = np.exp(log_length_scales)
 
     # hyperparameters = np.exp(log_hyperparameters)
     # length_scales = hyperparameters[1:-1]
@@ -156,8 +160,8 @@ if multiple_features:
     # Bar plot of the length_scales
     fig1 = plt.figure()
     y_pos = np.arange(nfeatures)
-    plt.barh(y_pos, log_length_scales)
-    plt.yticks(y_pos, labels=feature_names)
+    plt.barh(y_pos, normal_length_scales)
+    plt.yticks(y_pos, labels=feature_names, fontsize=7)
     plt.xlabel('Log length scales')
 
     plt.xscale("log")
@@ -186,5 +190,37 @@ if corr_matrix_flag:
 
 '''
 Notes:
-With less features, Y doesn't seem really important. More features? Y becomes more important
+
+Observations:
+VolumeDensity always important (we know)
+
+15 featues: Zmin en Xmin belangrijk
+16 features: Zmin en Xmin belangrijk
+34 features: Y's belangrijk
+all features: Y's maar nu ook Z, ElliR3, InscrBallRadius belangrijk
+
+Conclusions:
+Z en yield stress hebben hoge correlatie, ?: Xmin zelfde als bijv Xmax
+Same
+?: Y verschilt niet echt van X en Z. ?: Z nu onbelangrijk
+Crosscorrelation(InscrBallRadius and yield stress) > 0 (high) and Crosscorrelation(ElliR3 and yield stress) = 0
+---------------------------------------------
+
+Important remarks:
+1. First VolumeDensity is the most important, later the geometrical paramters are more important. Why?
+2. Z turns out to be important as well: Crosscorrelation(Z and VolumeDensity) = 0, Crosscorrelation(Z and yield stress) > 0
+3. Why is Z not important with 34 features but is with all features? (Z and InscrBallRadius are strongly correlated)
+4. Why is Y also important?
+
+Suggestions:
+1. andere kernel
+2. prior
+3. GP regression with Z and inscr radius? 
+
 '''
+
+
+'''
+GPs disadvantage: High dimensional --> efficiency loss
+'''
+
