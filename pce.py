@@ -81,7 +81,10 @@ dir = Path("./pce_expansions")
 # Create polynomial expansion
 orders = range(1, 9)
 
+first_sobols = []
+second_sobols = []
 total_sobols = []
+error_list = []
 
 for samples, evaluations, samples_validate, evaluations_validate in Kfold(samples, evaluations, 10):
     errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
@@ -105,7 +108,31 @@ for samples, evaluations, samples_validate, evaluations_validate in Kfold(sample
     for name, sobol in zip(fieldnames, total_sobol):
         print(f"{name:<20}: {sobol:.8f}")
 
+    first_sobols.append(first_sobol)
+    second_sobols.append(second_sobols)
     total_sobols.append(total_sobol)
+    error_list.append(math.sqrt(errors[best_order_arg]))
+
+errors_mean = np.mean(error_list, axis=0)
+errors_std = np.std(error_list, axis=0)
+
+print("average error")
+print(f"mean: {errors_mean:.8f}, std: {errors_std:.8f}")
+
+mean_f_sobol = np.mean(first_sobols, axis=0)
+std_f_sobol = np.std(first_sobols, axis=0)
+
+print("first order sobol indices for all tests")
+for name, mean, std in zip(fieldnames, mean_f_sobol, std_f_sobol):
+    print(f"{name:<20} mean: {mean:.8f}, std: {std}")
+
+#second_sobols = np.array(second_sobols)
+#mean_s_sobol = np.mean(second_sobols, axis=0)
+#for i in range(second_sobols.shape[1]):
+#    for j in range(second_sobols.shape[1]):
+#        if j >= i:
+#            continue
+#        print(f"{fieldnames[i]:<20} - {fieldnames[j]:<20} mean: {mean[i,j]:.8f}")
 
 mean_t_sobol = np.mean(total_sobols, axis=0)
 std_t_sobol = np.std(total_sobols, axis=0)
