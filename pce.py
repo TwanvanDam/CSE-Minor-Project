@@ -79,21 +79,21 @@ samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_
 dir = Path("./pce_expansions")
 
 # Create polynomial expansion
-orders = range(1, 9)
+orders = range(1, 2)
 
-first_sobols = []
-second_sobols = []
-total_sobols = []
-error_list = []
+k_fold = Kfold(samples, evaluations, 10)
 
-for samples, evaluations, samples_validate, evaluations_validate in Kfold(samples, evaluations, 10):
-    errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, dir)
+def process_fold(inputs):
+    samples, evaluations, samples_validate, evaluations_validate = inputs
+    save_dir = dir / str(hash(samples_validate.data.tobytes()) + hash(evaluations_validate.tobytes()))
+    save_dir.mkdir()
+    errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, save_dir)
 
     # Get lowest error order
     best_order_arg = np.argmin(errors)
     best_order = orders[best_order_arg]
-    print(dir / f"pce_fitted_{best_order}")
-    best_approx = chaospy.load(dir / f"pce_fitted_{best_order}", allow_pickle=True)
+    print(save_dir / f"pce_fitted_{best_order}")
+    best_approx = chaospy.load(save_dir / f"pce_fitted_{best_order}", allow_pickle=True)
     print(f"\nSelected order {best_order} to calculate Sobol indices")
 
     # Calculate Sobol indices
@@ -102,16 +102,28 @@ for samples, evaluations, samples_validate, evaluations_validate in Kfold(sample
     for name, sobol in zip(fieldnames, first_sobol):
         print(f"{name:<20}: {sobol:.8f}")
     print("Second order Sobol indices")
-    print(chaospy.Sens_m2(best_approx, joint))
+    second_sobol = chaospy.Sens_m2(best_approx, joint)
+    print(second_sobol)
     total_sobol = chaospy.Sens_t(best_approx, joint)
     print("Total sobol indices")
     for name, sobol in zip(fieldnames, total_sobol):
         print(f"{name:<20}: {sobol:.8f}")
+    rmse = math.sqrt(errors[best_order_arg])
+    return first_sobol, second_sobol, total_sobol, rmse
 
+results = map(process_fold, k_fold)
+
+first_sobols = []
+second_sobols = []
+total_sobols = []
+error_list = []
+
+for result in results:
+    first_sobol, second_sobol, total_sobol, rmse = result
     first_sobols.append(first_sobol)
-    second_sobols.append(second_sobols)
+    second_sobols.append(second_sobol)
     total_sobols.append(total_sobol)
-    error_list.append(math.sqrt(errors[best_order_arg]))
+    error_list.append(rmse)
 
 errors_mean = np.mean(error_list, axis=0)
 errors_std = np.std(error_list, axis=0)
