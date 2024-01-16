@@ -1,8 +1,10 @@
-#!/usr/bin/python3.12
+#!/usr/bin/python3.11
 
 import os
 import sys
 import imageio.v2 as imageio
+import matplotlib
+matplotlib.use('TkAgg')  # Use a different backend, like TkAgg
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.transforms import Affine2D
