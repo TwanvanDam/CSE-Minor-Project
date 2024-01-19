@@ -102,7 +102,8 @@ def process_fold(inputs):
     # for name, sobol in zip(fieldnames, first_sobol):
     #     print(f"{name:<20}: {sobol:.8f}")
     # print("Second order Sobol indices")
-    second_sobol = chaospy.Sens_m2(best_approx, joint)
+    # second_sobol = chaospy.Sens_m2(best_approx, joint)
+    second_sobol = [0]
     # print(second_sobol)
     total_sobol = chaospy.Sens_t(best_approx, joint)
     # print("Total sobol indices")
@@ -111,7 +112,7 @@ def process_fold(inputs):
     rmse = math.sqrt(errors[best_order_arg])
     return first_sobol, second_sobol, total_sobol, rmse
 
-with Pool(6) as p:
+with Pool(10) as p:
     k_fold = Kfold(samples, evaluations, 20)
     results = p.imap_unordered(process_fold, k_fold)
 
