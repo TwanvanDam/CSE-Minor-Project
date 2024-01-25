@@ -45,7 +45,7 @@ def train_pce(x_train, y_train, x_test, y_test, orders, save_dir):
         chaospy.save(save_dir / f"pce_fitted_{order}", approx)
         # print(f"saved order {order}, rmse: {math.sqrt(error)}")
 
-    return errors, joint
+    return errors, joint, evaluations_val_approx, y_test
 
 class Kfold:
     def __init__(self, x, y, k):
@@ -87,7 +87,7 @@ def process_fold(inputs):
     samples, evaluations, samples_validate, evaluations_validate = inputs
     save_dir = dir / str(hash(samples_validate.data.tobytes()) + hash(evaluations_validate.tobytes()))
     save_dir.mkdir()
-    errors, joint = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, save_dir)
+    errors, joint, y_test_pred, y_test = train_pce(samples, evaluations, samples_validate, evaluations_validate, orders, save_dir)
 
     # Get lowest error order
     best_order_arg = np.argmin(errors)
@@ -110,7 +110,7 @@ def process_fold(inputs):
     # for name, sobol in zip(fieldnames, total_sobol):
     #     print(f"{name:<20}: {sobol:.8f}")
     rmse = math.sqrt(errors[best_order_arg])
-    return first_sobol, second_sobol, total_sobol, rmse
+    return first_sobol, second_sobol, total_sobol, rmse, y_test_pred, y_test
 
 with Pool(10) as p:
     k_fold = Kfold(samples, evaluations, 20)
@@ -120,13 +120,17 @@ with Pool(10) as p:
     second_sobols = []
     total_sobols = []
     error_list = []
+    y_preds = []
+    y_truths = []
 
     for result in results:
-        first_sobol, second_sobol, total_sobol, rmse = result
+        first_sobol, second_sobol, total_sobol, rmse, y_test_pred, y_test = result
         first_sobols.append(first_sobol)
         second_sobols.append(second_sobol)
         total_sobols.append(total_sobol)
         error_list.append(rmse)
+        y_preds.append(y_test_pred)
+        y_truths.append(y_test)
 
 with open(dir/"total_sobols.csv", "w", newline='') as csvfile:
     writer = csv.writer(csvfile, delimiter=',')
@@ -139,6 +143,12 @@ with open(dir/"first_sobols.csv", "w", newline='') as csvfile:
     writer.writerow(fieldnames)
     for row in first_sobols:
         writer.writerow(row)
+
+with open(dir/"yield_predictions.csv", "w", newline='') as csvfile:
+    writer = csv.writer(csvfile, delimiter=',')
+    writer.writerow(["y_pred", "y_truth"])
+    for y_pred, y_truth in zip(y_preds, y_truths):
+        writer.writerow([y_pred, y_truth])
 
 errors_mean = np.mean(error_list, axis=0)
 errors_std = np.std(error_list, axis=0)
