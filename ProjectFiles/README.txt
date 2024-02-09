@@ -30,5 +30,6 @@ Machine learning:
 	Lastly, see folder 3, followed by folder 2 and then folder 4 to investigate ARD (multiple GP runs)
 
 -Gaussian Processes using Pytorch
+	Contains only one Python file, by default it does not do the full optimization. 
 
 -Polynomial Chaos Expansion (PCE)
