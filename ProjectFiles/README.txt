@@ -33,3 +33,5 @@ Machine learning:
 	Contains only one Python file, by default it does not do the full optimization. 
 
 -Polynomial Chaos Expansion (PCE)
+	This is implemented in the pce.py file. In the beginning of the file are some variables for configuration.
+	part of the output is saved in the directory specified in this configuration, the other part is printed.
