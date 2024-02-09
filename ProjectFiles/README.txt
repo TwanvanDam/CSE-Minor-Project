@@ -5,7 +5,8 @@ Twan, Guido, Jorn, Marijn and Joey
 
 ====================
 Data processing:
-
+The MaxDerivative file calcutes the yield point for every sample using the energy method and the offset method
+The Merge file, merges the features with the yield points and it can also clean the dataset
 --------------------
 FEM:
 
