@@ -7,6 +7,16 @@ from random import sample
 from pathlib import Path
 from multiprocessing import Pool
 
+data_file = "Results/merged_data_offset_final.csv"  # File with the data
+fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]  # fields to use from the datafile
+result_fieldname = "Yield Stress"  # field with the result
+
+orders = range(1, 9)  # orders to use for the expansions
+num_folds = 20  # numer of folds to use for k-fold cross validation
+
+num_threads = 10  # number of threads for multiprocessing
+dir = Path("./pce_expansions")  # empty directory to save the expansions to
+
 def read_data(sample_fieldnames, evaluation_fieldname, path):
     samples = [[] for _ in sample_fieldnames]
     evaluations = []
@@ -76,15 +86,9 @@ class Kfold:
         else:
             raise StopIteration
 
-fieldnames = ["VolumeDensity", "SurfaceAreaDensity", "MeanBreadthDensity", "EulerNumberDensity"]
-samples, evaluations  = read_data(fieldnames, " Yield Stress ", "Results/merged_data_offsetcleaned.csv")
-
-dir = Path("./pce_expansions")
+samples, evaluations  = read_data(fieldnames, result_fieldname, data_file)
 
 # Create polynomial expansion
-orders = range(1, 9)
-
-
 def process_fold(inputs):
     samples, evaluations, samples_validate, evaluations_validate = inputs
     save_dir = dir / str(hash(samples_validate.data.tobytes()) + hash(evaluations_validate.tobytes()))
@@ -114,8 +118,8 @@ def process_fold(inputs):
     rmse = math.sqrt(errors[best_order_arg])
     return first_sobol, second_sobol, total_sobol, rmse, y_test_pred[best_order_arg], y_test
 
-with Pool(10) as p:
-    k_fold = Kfold(samples, evaluations, 20)
+with Pool(num_threads) as p:
+    k_fold = Kfold(samples, evaluations, num_folds)
     results = p.imap_unordered(process_fold, k_fold)
 
     first_sobols = []
@@ -134,6 +138,7 @@ with Pool(10) as p:
         y_preds = np.append(y_preds, y_test_pred)
         y_truths = np.append(y_truths, y_test)
 
+# Write results to files
 with open(dir/"total_sobols.csv", "w", newline='') as csvfile:
     writer = csv.writer(csvfile, delimiter=',')
     writer.writerow(fieldnames)
