@@ -9,7 +9,8 @@ The MaxDerivative file calcutes the yield point for every sample using the energ
 The Merge file, merges the features with the yield points and it can also clean the dataset
 --------------------
 FEM:
-
+For the 2D FEM simulations the compression_plastic_2D-image_reader.i file was used this contains the image reader to create the mesh as well as the settings for moose. 
+For the 3D FEM simulations the mesh is created using the image_reader.i file. This mesh can then be used as an input file for the FEM simulation which is ran using the ctscan_uniax_comp.i file which contains all the relevant settings for moose.
 --------------------
 Machine learning:
 
